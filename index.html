@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NEURO — Neural Communication Interface</title>
+<style>
+:root{color-scheme:dark;--bg:#17191c;--fg:#e9ebee;--mut:#8d939a;--cy:#5ae6f2;--ln:#2c3036;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 "Avenir Next","Segoe UI",Helvetica,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;padding:14px 20px 6px}
+h1{margin:0;font-size:22px;font-weight:300;letter-spacing:.42em}
+header p{margin:0;color:var(--mut);font-size:13px}
+#stage{flex:1;position:relative;min-height:300px;touch-action:none;cursor:grab}
+#stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#info{position:absolute;left:20px;top:8px;max-width:min(380px,70%);pointer-events:none}
+#info b{font-weight:500;font-size:16px}
+#info span{display:block;color:var(--mut);font-size:12.5px}
+.lb{position:absolute;pointer-events:none;font-size:11.5px;color:var(--fg);white-space:nowrap;padding-left:14px;transform:translateY(-50%)}
+.lb:before{content:"";position:absolute;left:0;top:50%;width:8px;height:1px;background:var(--cy)}
+nav{display:flex;gap:6px;overflow-x:auto;padding:8px 20px;border-top:1px solid var(--ln)}
+nav button{flex:none;background:none;color:var(--mut);border:1px solid var(--ln);border-radius:20px;padding:6px 14px;font:inherit;cursor:pointer}
+nav button:hover{color:var(--fg)}
+nav button[aria-current=true]{color:var(--bg);background:var(--fg);border-color:var(--fg)}
+nav button:focus-visible{outline:2px solid var(--cy);outline-offset:2px}
+footer{padding:4px 20px 10px;color:var(--mut);font-size:11.5px}
+footer em{font-style:normal;color:var(--fg)}
+</style></head><body>
+<header><h1>NEURO</h1><p>“Communication, Beyond Touch.”</p></header>
+<div id="stage"><div id="info"><b></b><span></span></div></div>
+<nav id="tabs" aria-label="Views"></nav>
+<footer><em>Concept wearable — neural communication interface.</em> Stylized real-time 3D model, not a photograph. Size targets (≈40 × 15 × 6.5 mm) are preliminary. Sensor regions and internals are conceptual, not validated hardware; NEURO does not read thoughts or decode speech.</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const T=THREE,$=s=>document.querySelector(s),stage=$('#stage');
+const R=new T.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));
+R.toneMapping=T.ACESFilmicToneMapping;R.toneMappingExposure=1.1;R.outputEncoding=T.sRGBEncoding;
+stage.prepend(R.domElement);
+const S=new T.Scene();S.background=new T.Color(0x1a1c1f);
+const cam=new T.PerspectiveCamera(28,1,1,3000);
+// studio reflection map
+const ec=document.createElement('canvas');ec.width=512;ec.height=256;const cx=ec.getContext('2d');
+let gr=cx.createLinearGradient(0,0,0,256);gr.addColorStop(0,'#cfd6dd');gr.addColorStop(.5,'#3b4148');gr.addColorStop(1,'#0c0d0f');
+cx.fillStyle=gr;cx.fillRect(0,0,512,256);cx.fillStyle='#fff';cx.fillRect(50,45,100,45);cx.fillRect(320,35,60,75);
+cx.fillStyle='#5ae6f2';cx.fillRect(450,70,16,70);
+const et=new T.CanvasTexture(ec);et.mapping=T.EquirectangularReflectionMapping;et.encoding=T.sRGBEncoding;
+S.environment=new T.PMREMGenerator(R).fromEquirectangular(et).texture;
+const key=new T.DirectionalLight(0xffffff,1.1);key.position.set(120,160,200);S.add(key);
+const rim=new T.DirectionalLight(0x6fe8f4,.7);rim.position.set(-200,60,-120);S.add(rim);
+
+const std=(c,r,m)=>new T.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+function ell(a,b,c,s=48){const g=new T.SphereGeometry(1,s,32);g.scale(a,b,c);return g}
+function bend(g,k){const p=g.attributes.position;for(let i=0;i<p.count;i++)p.setZ(i,p.getZ(i)-k*p.getX(i)**2);return g}
+function wordmark(){const c=document.createElement('canvas');c.width=512;c.height=128;const x=c.getContext('2d');
+x.font='300 70px Helvetica,Arial,sans-serif';if('letterSpacing'in x)x.letterSpacing='14px';x.textAlign='center';x.textBaseline='middle';
+x.fillStyle='rgba(15,16,18,.8)';x.fillText('NEURO',256,66);const t=new T.CanvasTexture(c);t.anisotropy=4;t.encoding=T.sRGBEncoding;return t}
+const WM=wordmark();
+const V={ti:{n:'Titanium silver',m:0xb6babf,r:.34,mt:1,s:0x2a2c2f},gr:{n:'Graphite black',m:0x2b2d31,r:.38,mt:.9,s:0x141517},pw:{n:'Pearl white',m:0xe8e5e0,r:.3,mt:.55,s:0xd0cdc7}};
+// device: separate named, editable components (mm, local +z = outward, -z = skin)
+function mk(v,name){
+ const D=new T.Group();D.name='NEURO_'+name;const P={};
+ const add=(n,m,base,k)=>{const g=new T.Group();g.name=n;g.add(m);g.position.z=base;g.userData={base,k};P[n]=g;D.add(g);return g};
+ const hm=std(V[v].m,V[v].r,V[v].mt);
+ const H=add('housing',new T.Mesh(bend(ell(20,7.5,2.6),.004),hm),.6,20);
+ const win=new T.Mesh(ell(2.8,1.4,.35,24),std(0x0b0d10,.1,.2));win.position.set(14,0,1.0);win.rotation.y=.235;H.add(win);
+ const led=new T.Mesh(ell(.45,.45,.45,16),new T.MeshBasicMaterial({color:0x5ae6f2}));led.position.set(14,0,1.25);H.add(led);
+ const wm=new T.Mesh(new T.PlaneGeometry(8,2),new T.MeshBasicMaterial({map:WM,transparent:true,depthWrite:false}));
+ wm.position.set(-5,0,2.43);wm.rotation.y=-.074;H.add(wm);
+ const box=(w,h,d,c,r,m)=>new T.Mesh(new T.BoxGeometry(w,h,d),std(c,r,m));
+ add('wireless_module',box(7,5,.9,0x4a4d52,.4,.8),1.1,13).children[0].position.x=-12;
+ add('electronics_pcb',box(28,9.5,.5,0x23473d,.5,.2),.3,8);
+ add('battery',box(24,9,1.6,0x8a8e94,.45,.9),-.9,3);
+ const sg=add('sensor_assembly',box(30,6,.2,0xb08a4e,.4,.8),-2.3,-3);P.pads=[];
+ [-10,0,10].forEach(x=>{const p=new T.Mesh(new T.CylinderGeometry(1.7,1.7,.5,32),std(0x9fb2b8,.35,.9));p.rotation.x=Math.PI/2;p.position.set(x,0,-1.4-.004*x*x);p.name='sensor_region_concept';sg.add(p);P.pads.push(p)});
+ add('silicone_layer',new T.Mesh(bend(ell(19,6.8,1.7),.004),std(V[v].s,.92,0)),-1.7,-8);
+ D.userData.P=P;return D;
+}
+// scene objects
+const head=new T.Group(),skin=std(0xc69a82,.65,0);
+const hd=new T.Mesh(ell(75,95,85,64),skin);head.add(hd);
+const hair=new T.Mesh(new T.SphereGeometry(1,48,32,0,Math.PI*2,0,1.05).scale(77,97,87),std(0x1c1917,.9,0));head.add(hair);
+const neck=new T.Mesh(new T.CylinderGeometry(36,40,120,40),skin);neck.position.set(0,-120,-6);head.add(neck);
+const nose=new T.Mesh(new T.ConeGeometry(8,22,24),skin);nose.rotation.x=Math.PI/2;nose.position.set(0,-8,92);head.add(nose);
+[1,-1].forEach(s=>{
+ const ear=new T.Mesh(ell(4,21,13),std(0xb98d77,.7,0));ear.position.set(74*s,-6,-14);head.add(ear);
+ const lid=new T.Mesh(ell(5,3.6,8),std(0xb98d77,.7,0));lid.position.set(46*s,0,66);head.add(lid);
+ const brow=new T.Mesh(ell(6,2.2,13),std(0x2a221d,.9,0));brow.position.set(45*s,11,66);head.add(brow);
+});
+S.add(head);
+const P0=new T.Vector3(64.5,28,35),N=new T.Vector3(.9,.243,.38).normalize();
+const W=new T.Group();W.position.copy(P0).addScaledVector(N,3.9);S.add(W);W.lookAt(P0.clone().add(N.clone().multiplyScalar(50)));
+const worn=mk('ti','worn');worn.rotation.z=.3;W.add(worn);
+const solo=mk('ti','solo');solo.rotation.order='YXZ';S.add(solo);
+const vars=['ti','gr','pw'].map((v,i)=>{const d=mk(v,V[v].n);d.rotation.order='YXZ';d.position.x=(i-1)*58;S.add(d);return d});
+
+// views
+const hero=[135,48,102];
+const views=[
+{n:'Hero',t:'Hero render',d:'Worn at the right temple, between the outer eye corner and the upper ear.',head:1,pos:hero,tg:[66,29,36],fov:28},
+{n:'Three-quarter',t:'Three-quarter view',d:'Satin titanium shell, ceramic window and a single cyan status light.',solo:1,rot:[-.8,-.7,0],pos:[0,0,105],tg:[0,0,0],fov:26,bob:1},
+{n:'Side profile',t:'Side profile',d:'About 6.5 mm thick, with a gently arched skin-contact surface.',solo:1,rot:[0,0,0],pos:[0,-120,0],tg:[0,0,0],fov:24,up:[0,0,1]},
+{n:'Contact surface',t:'Rear contact surface',d:'Soft silicone layer with three conceptual sensor-contact regions.',solo:1,rot:[0,0,0],pos:[-8,16,-108],tg:[0,0,-2],fov:26,
+ lb:[[solo,[-10,0,-4.1],'Contact region 1 (concept)'],[solo,[0,0,-4.1],'Contact region 2 (concept)'],[solo,[10,0,-4.1],'Contact region 3 (concept)'],[solo,[-15,5,-3],'Silicone skin interface']]},
+{n:'Exploded',t:'Exploded view',d:'Conceptual layout. Components are design elements, not validated hardware.',solo:1,rot:[0,0,0],ex:1,pos:[90,-100,45],tg:[0,0,8],fov:28,up:[0,0,1],
+ lb:[[solo,[0,0,23.2],'Titanium housing (concept)'],[solo,[-12,0,14.4],'Wireless module (concept)'],[solo,[0,0,8.5],'Internal electronics (concept)'],[solo,[0,0,1.9],'Battery (concept)'],[solo,[0,0,-5.3],'Sensor assembly (concept)'],[solo,[0,0,-11.5],'Silicone contact layer']]},
+{n:'Wearable scale',t:'Wearable scale',d:'Ear, eye and temple shown for scale. Discreet from the front and side.',head:1,pos:[330,30,170],tg:[10,5,20],fov:28},
+{n:'Colours',t:'Colour variants',d:'Titanium silver, graphite black, pearl white.',vars:1,rot:[-.75,-.3,.12],pos:[0,0,185],tg:[0,0,0],fov:28,
+ lb:vars.map((d,i)=>[d,[-14,-14,0],V[['ti','gr','pw'][i]].n])}
+];
+let cur=0,V0=views[0],cp=new T.Vector3(...hero),ct=new T.Vector3(66,29,36),fovT=28,ex=0,yaw=0,drag=0,lx=0,lbs=[];
+const info=$('#info'),tabs=$('#tabs');
+views.forEach((v,i)=>{const b=document.createElement('button');b.textContent=v.n;b.onclick=()=>go(i);tabs.append(b)});
+function go(i){cur=i;V0=views[i];[...tabs.children].forEach((b,j)=>b.setAttribute('aria-current',j==i));
+ info.firstChild.textContent=V0.t;info.lastChild.textContent=V0.d;
+ head.visible=W.visible=!!V0.head;solo.visible=!!V0.solo;vars.forEach(d=>d.visible=!!V0.vars);
+ if(V0.rot){solo.rotation.set(...V0.rot);vars.forEach(d=>d.rotation.set(...V0.rot))}
+ cam.up.set(...(V0.up||[0,1,0]));yaw=0;
+ lbs.forEach(l=>l.el.remove());lbs=(V0.lb||[]).map(a=>{const el=document.createElement('div');el.className='lb';el.textContent=a[2];stage.append(el);return{el,d:a[0],v:new T.Vector3(...a[1])}})}
+function size(){const w=stage.clientWidth,h=stage.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+addEventListener('resize',size);
+stage.addEventListener('pointerdown',e=>{drag=1;lx=e.clientX});
+addEventListener('pointerup',()=>drag=0);
+addEventListener('pointermove',e=>{if(drag){yaw+=(e.clientX-lx)*.008;lx=e.clientX}});
+const still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function setEx(d,e){Object.values(d.userData.P).forEach(g=>{if(g.userData&&g.userData.k!==undefined)g.position.z=g.userData.base+g.userData.k*e})}
+const q=new T.Vector3();
+function loop(t){requestAnimationFrame(loop);t/=1000;
+ cp.lerp(q.set(...V0.pos),.07);ct.lerp(q.set(...V0.tg),.07);cam.fov+=(V0.fov-cam.fov)*.07;cam.updateProjectionMatrix();
+ ex+=((V0.ex||0)-ex)*.06;setEx(solo,ex);
+ if(V0.bob&&!still){solo.position.y=Math.sin(t*1.1)*1.6}else solo.position.y=0;
+ const fit=Math.max(1,1.2/cam.aspect),sway=(drag||still)?0:Math.sin(t*.45)*.1;
+ const off=cp.clone().sub(ct).multiplyScalar(fit).applyAxisAngle(cam.up,yaw+sway);
+ cam.position.copy(ct).add(off);cam.lookAt(ct);
+ S.updateMatrixWorld();const w=stage.clientWidth,h=stage.clientHeight;
+ lbs.forEach(l=>{const p=l.d.localToWorld(l.v.clone()).project(cam);l.el.style.display=p.z>1?'none':'block';l.el.style.left=(p.x*.5+.5)*w+'px';l.el.style.top=(-p.y*.5+.5)*h+'px'});
+ R.render(S,cam)}
+size();go(0);requestAnimationFrame(loop);
+</script></body></html>
